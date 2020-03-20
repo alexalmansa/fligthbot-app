@@ -1,10 +1,15 @@
 package com.example.fligthbot;
 
+import android.app.Activity;
 import android.os.Bundle;
 
-import com.example.fligthbot.model.FlightBot;
 import com.example.fligthbot.model.Message;
 import com.example.fligthbot.model.MessageListAdapter;
+import com.example.fligthbot.model.Response;
+import com.google.gson.Gson;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -20,17 +25,16 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
 
 public class MainActivity extends AppCompatActivity {
 
         private RecyclerView mMessageRecycler;
-        private MessageListAdapter mMessageAdapter;
         private EditText mChatBox;
         private Button mSendButton;
         private List<Message> messageList;
         private TextView tvWritting;
-        FlightBot bot;
+        private MessageListAdapter mMessageAdapter;
+
 
         @Override
 
@@ -38,8 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
             super.onCreate(savedInstanceState);
             setContentView(R.layout.activity_main);
-            bot = new FlightBot();
-
+            
             viewSetup();
             chatBoxSetup();
 
@@ -99,8 +102,41 @@ public class MainActivity extends AppCompatActivity {
                     //TODO: REND MESSAGE
 
                     Message mes = new Message(mChatBox.getText().toString(),1);
-                    final Message resp = new Message(bot.getResponse(mChatBox.getText().toString().toLowerCase()),2);
+
                     messageList.add(mes);
+                    mMessageRecycler.scrollToPosition(messageList.size() - 1);
+
+
+                    Unirest.setTimeouts(0, 0);
+                    Thread thread = new Thread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            try  {
+                                try {
+                                    HttpResponse<String> response = Unirest.post("http://62.57.180.90:4444")
+                                            .header("Content-Type", "text/plain")
+                                            .body("{\n\t\"User\":\"Marc\",\n\t\"Message\":\""+mChatBox.getText().toString() +"\"\n}")
+                                            .asString();
+                                    Response data = new Gson().fromJson(response.getBody(), Response.class);
+                                    final Message resp = new Message(data.getFulfillmentText(),2);
+                                    messageList.add(resp);
+                                } catch (UnirestException e) {
+                                    e.printStackTrace();
+
+                                }                            }
+                            catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+
+                    thread.start();
+
+
+
+
+
                     mChatBox.setText("");
                     mMessageAdapter.notifyDataSetChanged();
                     tvWritting.setVisibility(View.VISIBLE);
@@ -109,9 +145,11 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void run() {
 
-                            messageList.add(resp);
+
                             mMessageAdapter.notifyDataSetChanged();
                             tvWritting.setVisibility(View.INVISIBLE);
+                            mMessageAdapter.notifyDataSetChanged();
+                            mMessageRecycler.scrollToPosition(messageList.size() - 1);
 
                         }
                     }, 2000);
