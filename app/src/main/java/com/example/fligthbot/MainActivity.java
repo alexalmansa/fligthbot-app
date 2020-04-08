@@ -1,6 +1,9 @@
 package com.example.fligthbot;
 
-import android.app.Activity;
+import android.content.Intent;
+import android.icu.text.DateFormat;
+import android.icu.text.SimpleDateFormat;
+import android.net.Uri;
 import android.os.Bundle;
 
 import com.example.fligthbot.model.Message;
@@ -23,10 +26,14 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import java.sql.Time;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+        private final static String IP = "10.0.2.2";
+        private final static String PORT = "4444";
 
         private RecyclerView mMessageRecycler;
         private EditText mChatBox;
@@ -34,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
         private List<Message> messageList;
         private TextView tvWritting;
         private MessageListAdapter mMessageAdapter;
+        private DateFormat outputformat;
 
 
         @Override
@@ -42,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
 
             super.onCreate(savedInstanceState);
             setContentView(R.layout.activity_main);
-            
+            outputformat = new SimpleDateFormat("HH:mm");
             viewSetup();
             chatBoxSetup();
 
@@ -64,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
             mMessageRecycler.setLayoutManager(linearLayoutManager);
 
 
-            mMessageAdapter = new MessageListAdapter(this, messageList);
+            mMessageAdapter = new MessageListAdapter(getBaseContext(), messageList);
             mMessageRecycler.setAdapter(mMessageAdapter);
 
         }
@@ -99,12 +107,26 @@ public class MainActivity extends AppCompatActivity {
             mSendButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    //TODO: REND MESSAGE
 
-                    Message mes = new Message(mChatBox.getText().toString(),1);
+
+                    Message mes = new Message(mChatBox.getText().toString(),Message.VIEW_TYPE_MESSAGE_SENT,outputformat.format(new Date()) );
 
                     messageList.add(mes);
                     mMessageRecycler.scrollToPosition(messageList.size() - 1);
+
+                    mes = new Message(mChatBox.getText().toString(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "google.navigation:q=Passeig de Gràcia, 43, 08007 Barcelona, Spain",outputformat.format(new Date()));
+
+                    messageList.add(mes);
+                    mMessageRecycler.scrollToPosition(messageList.size() - 1);
+
+
+
+                    //Open maps with navigation to go to this adress
+                    //Uri gmmIntentUri = Uri.parse("google.navigation:q=Passeig de Gràcia, 43, 08007 Barcelona, Spain");
+
+                    //Open maps with direction
+                    //geo:0,0?q=Passeig de Gràcia, 43, 08007 Barcelona, Spain
+
 
 
                     Unirest.setTimeouts(0, 0);
@@ -114,12 +136,18 @@ public class MainActivity extends AppCompatActivity {
                         public void run() {
                             try  {
                                 try {
-                                    HttpResponse<String> response = Unirest.post("http://62.57.180.90:4444")
+                                    HttpResponse<String> response = Unirest.post(IP + ":" + PORT )
                                             .header("Content-Type", "text/plain")
-                                            .body("{\n\t\"User\":\"Marc\",\n\t\"Message\":\""+mChatBox.getText().toString() +"\"\n}")
+                                            .body("{\n\t\"User\":\"Alex\",\n\t\"Message\":\""+mChatBox.getText().toString() +"\"\n}")
                                             .asString();
                                     Response data = new Gson().fromJson(response.getBody(), Response.class);
-                                    final Message resp = new Message(data.getFulfillmentText(),2);
+                                    if (data.getIntent().equals("Info")){
+
+
+                                    }
+                                    Date time = new Time(System.currentTimeMillis());
+                                    final Message resp = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
+
                                     messageList.add(resp);
                                 } catch (UnirestException e) {
                                     e.printStackTrace();
