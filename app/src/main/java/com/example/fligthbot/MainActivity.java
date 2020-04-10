@@ -26,15 +26,18 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import org.apache.http.entity.StringEntity;
+
 import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-        private final static String IP = "10.0.2.2";
+        private final static String IP = "192.168.1.74";
         private final static String PORT = "4444";
 
+        private volatile boolean ended;
         private RecyclerView mMessageRecycler;
         private EditText mChatBox;
         private Button mSendButton;
@@ -114,56 +117,7 @@ public class MainActivity extends AppCompatActivity {
                     messageList.add(mes);
                     mMessageRecycler.scrollToPosition(messageList.size() - 1);
 
-                    mes = new Message(mChatBox.getText().toString(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "google.navigation:q=Passeig de Gràcia, 43, 08007 Barcelona, Spain",outputformat.format(new Date()));
-
-                    messageList.add(mes);
-                    mMessageRecycler.scrollToPosition(messageList.size() - 1);
-
-
-
-                    //Open maps with navigation to go to this adress
-                    //Uri gmmIntentUri = Uri.parse("google.navigation:q=Passeig de Gràcia, 43, 08007 Barcelona, Spain");
-
-                    //Open maps with direction
-                    //geo:0,0?q=Passeig de Gràcia, 43, 08007 Barcelona, Spain
-
-
-
-                    Unirest.setTimeouts(0, 0);
-                    Thread thread = new Thread(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            try  {
-                                try {
-                                    HttpResponse<String> response = Unirest.post(IP + ":" + PORT )
-                                            .header("Content-Type", "text/plain")
-                                            .body("{\n\t\"User\":\"Alex\",\n\t\"Message\":\""+mChatBox.getText().toString() +"\"\n}")
-                                            .asString();
-                                    Response data = new Gson().fromJson(response.getBody(), Response.class);
-                                    if (data.getIntent().equals("Info")){
-
-
-                                    }
-                                    Date time = new Time(System.currentTimeMillis());
-                                    final Message resp = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
-
-                                    messageList.add(resp);
-                                } catch (UnirestException e) {
-                                    e.printStackTrace();
-
-                                }                            }
-                            catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    });
-
-                    thread.start();
-
-
-
-
+                    httpRequest();
 
                     mChatBox.setText("");
                     mMessageAdapter.notifyDataSetChanged();
@@ -189,7 +143,47 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-        // cal modificar coses aqui
+        private void httpRequest(){
+            Thread thread = new Thread(new Runnable() {
+
+                @Override
+                public void run() {
+                    try  {
+                        try {
+                            String mess = mChatBox.getText().toString().replaceAll("\n", "");
+                            Unirest.setTimeouts(0, 0);
+                            HttpResponse<String> response = Unirest.post("http://" +IP + ":4444")
+                                    .header("Content-Type", "text/plain")
+                                    .body("{\r\n\t\"User\":\"Marc\",\r\n\t\"Message\":\"" + mess + "\"\r\n}")
+                                    .asString();
+                            Response data = new Gson().fromJson(response.getBody(), Response.class);
+                            Message mes;
+                            if (data.getIntent().equals("arribe")){
+                                mes  = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "google.navigation:q="+data.getFulfillmentText() ,outputformat.format(new Date()));
+
+                            }else if (data.getIntent().equals("address")){
+                                mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "geo:0,0?q="+data.getFulfillmentText() ,outputformat.format(new Date()));
+
+                            }else {
+                                mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
+
+                            }
+                            messageList.add(mes);
+                            ended = true;
+
+                        } catch (UnirestException e) {
+                            e.printStackTrace();
+
+                        }                            }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            thread.start();
+
+        }
 
 }
 
