@@ -1,6 +1,10 @@
 package com.example.fligthbot;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.icu.text.DateFormat;
 import android.icu.text.SimpleDateFormat;
 import android.net.Uri;
@@ -10,37 +14,47 @@ import com.example.fligthbot.model.Message;
 import com.example.fligthbot.model.MessageListAdapter;
 import com.example.fligthbot.model.Response;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Handler;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
-import org.apache.http.entity.StringEntity;
-
-import java.sql.Time;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-        private final static String IP = "192.168.1.74";
+
+        private static String IP ;
+        private static String NAME;
+
         private final static String PORT = "4444";
 
-        private volatile boolean ended;
+
+        private static SharedPreferences sharedPreferences;
+
         private RecyclerView mMessageRecycler;
         private EditText mChatBox;
         private Button mSendButton;
+        private ImageView ivSettings;
+
+
         private List<Message> messageList;
         private TextView tvWritting;
         private MessageListAdapter mMessageAdapter;
@@ -48,21 +62,40 @@ public class MainActivity extends AppCompatActivity {
 
 
         @Override
-
         protected void onCreate(Bundle savedInstanceState) {
 
             super.onCreate(savedInstanceState);
             setContentView(R.layout.activity_main);
             outputformat = new SimpleDateFormat("HH:mm");
+
+            checkPreferences();
+
             viewSetup();
             chatBoxSetup();
 
+        }
 
+        private void checkPreferences(){
+            messageList = new ArrayList<>();
+            sharedPreferences = getSharedPreferences(getString(R.string.SHARED_PREFERENCES), Context.MODE_PRIVATE);
+            IP = sharedPreferences.getString(getString(R.string.IP_KEY), null);
+            if (IP == null){
+                Intent intent = new Intent(this, ConfigActivity.class);
+                startActivity(intent);
+                IP = sharedPreferences.getString(getString(R.string.IP_KEY), null);
+            }
+            NAME = sharedPreferences.getString(getString(R.string.NAME_KEY), null);
+
+            String jsonPreferences = sharedPreferences.getString(getString(R.string.MESSAGE_KEY), "");
+            Gson gson = new Gson();
+            Type type = new TypeToken<List<Message>>() {}.getType();
+            if (gson.fromJson(jsonPreferences, type) != null){
+                messageList = gson.fromJson(jsonPreferences, type);
+            }
         }
 
 
         private void viewSetup() {
-            messageList = new ArrayList<>();
 
             tvWritting = findViewById(R.id.tv_writting);
             mMessageRecycler = (RecyclerView) findViewById(R.id.reyclerview_message_list);
@@ -77,6 +110,25 @@ public class MainActivity extends AppCompatActivity {
 
             mMessageAdapter = new MessageListAdapter(getBaseContext(), messageList);
             mMessageRecycler.setAdapter(mMessageAdapter);
+
+            ivSettings = findViewById(R.id.iv_settings);
+            ivSettings.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(getApplicationContext(), ConfigActivity.class);
+                    startActivity(intent);
+                    IP = sharedPreferences.getString(getString(R.string.IP_KEY), null);
+                    NAME = sharedPreferences.getString(getString(R.string.NAME_KEY), null);
+                    String jsonPreferences = sharedPreferences.getString(getString(R.string.MESSAGE_KEY), "");
+                    Gson gson = new Gson();
+                    Type type = new TypeToken<List<Message>>() {}.getType();
+                    messageList = gson.fromJson(jsonPreferences, type);
+                    if (messageList == null){
+                        messageList = new ArrayList<>();
+                    }
+                    mMessageAdapter.notifyDataSetChanged();
+                }
+            });
 
         }
 
@@ -106,19 +158,21 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
+            onClickSend();
+
+        }
+
+        private void onClickSend(){
             // Send text button
             mSendButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
 
-
                     Message mes = new Message(mChatBox.getText().toString(),Message.VIEW_TYPE_MESSAGE_SENT,outputformat.format(new Date()) );
 
                     messageList.add(mes);
                     mMessageRecycler.scrollToPosition(messageList.size() - 1);
-
                     httpRequest();
-
                     mChatBox.setText("");
                     mMessageAdapter.notifyDataSetChanged();
                     tvWritting.setVisibility(View.VISIBLE);
@@ -134,15 +188,10 @@ public class MainActivity extends AppCompatActivity {
                             mMessageRecycler.scrollToPosition(messageList.size() - 1);
 
                         }
-                    }, 2000);
-
-
+                    }, 2500);
                 }
             });
-
-
         }
-
         private void httpRequest(){
             Thread thread = new Thread(new Runnable() {
 
@@ -152,9 +201,9 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             String mess = mChatBox.getText().toString().replaceAll("\n", "");
                             Unirest.setTimeouts(0, 0);
-                            HttpResponse<String> response = Unirest.post("http://" +IP + ":4444")
+                            HttpResponse<String> response = Unirest.post("http://" +IP + ":"+PORT)
                                     .header("Content-Type", "text/plain")
-                                    .body("{\r\n\t\"User\":\"Marc\",\r\n\t\"Message\":\"" + mess + "\"\r\n}")
+                                    .body("{\r\n\t\"User\":\"" + NAME + "\",\r\n\t\"Message\":\"" + mess + "\"\r\n}")
                                     .asString();
                             Response data = new Gson().fromJson(response.getBody(), Response.class);
                             Message mes;
@@ -164,17 +213,22 @@ public class MainActivity extends AppCompatActivity {
                             }else if (data.getIntent().equals("address")){
                                 mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "geo:0,0?q="+data.getFulfillmentText() ,outputformat.format(new Date()));
 
-                            }else {
+                            } else if (data.getIntent().equals("Info") || data.getIntent().equals("travel to city - yes")){
+                                String address = data.getFulfillmentText().substring(data.getFulfillmentText().indexOf(":")+1);
+                                address = address.substring(0,address.indexOf("--"));
+                                mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "geo:0,0?q="+address ,outputformat.format(new Date()));
+
+                            }else{
                                 mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
 
                             }
                             messageList.add(mes);
-                            ended = true;
 
                         } catch (UnirestException e) {
                             e.printStackTrace();
 
-                        }                            }
+                        }
+                    }
                     catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -185,6 +239,17 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
+        @Override
+        protected void onPause() {
+            Gson gson = new Gson();
+            String jsonCurProduct = gson.toJson(messageList);
+
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+
+            editor.putString(getString(R.string.MESSAGE_KEY), jsonCurProduct);
+            editor.commit();
+            super.onPause();
+        }
 }
 
 
