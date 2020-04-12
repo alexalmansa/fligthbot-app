@@ -33,6 +33,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -59,8 +60,12 @@ public class MainActivity extends AppCompatActivity {
         private TextView tvWritting;
         private MessageListAdapter mMessageAdapter;
         private DateFormat outputformat;
+        static HttpListener listener;
 
-
+        public interface HttpListener {
+            // you can define any parameter as per your requirement
+            public void callback(boolean success);
+        }
         @Override
         protected void onCreate(Bundle savedInstanceState) {
 
@@ -68,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
             setContentView(R.layout.activity_main);
             outputformat = new SimpleDateFormat("HH:mm");
 
+            prepareListener();
             checkPreferences();
 
             viewSetup();
@@ -94,6 +100,29 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        private void prepareListener(){
+            listener = new HttpListener() {
+                @Override
+                public void callback(boolean success) {
+                    if (success) {
+
+                        tvWritting.setVisibility(View.INVISIBLE);
+                        mMessageAdapter.notifyDataSetChanged();
+                        mMessageRecycler.scrollToPosition(messageList.size() - 1);
+                    }else {
+                        tvWritting.setVisibility(View.INVISIBLE);
+                        MainActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(MainActivity.this,
+                                        "Error connecting to GoFly server, check that you have the correct ip and that the server is running", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                    }
+
+            };
+        }
 
         private void viewSetup() {
 
@@ -122,9 +151,9 @@ public class MainActivity extends AppCompatActivity {
                     String jsonPreferences = sharedPreferences.getString(getString(R.string.MESSAGE_KEY), "");
                     Gson gson = new Gson();
                     Type type = new TypeToken<List<Message>>() {}.getType();
-                    messageList = gson.fromJson(jsonPreferences, type);
-                    if (messageList == null){
-                        messageList = new ArrayList<>();
+                    ArrayList<Message> messages = gson.fromJson(jsonPreferences, type);
+                    if (messages == null){
+                        messageList.clear();
                     }
                     mMessageAdapter.notifyDataSetChanged();
                 }
@@ -182,10 +211,7 @@ public class MainActivity extends AppCompatActivity {
                         public void run() {
 
 
-                            mMessageAdapter.notifyDataSetChanged();
-                            tvWritting.setVisibility(View.INVISIBLE);
-                            mMessageAdapter.notifyDataSetChanged();
-                            mMessageRecycler.scrollToPosition(messageList.size() - 1);
+
 
                         }
                     }, 2500);
@@ -206,6 +232,7 @@ public class MainActivity extends AppCompatActivity {
                                     .body("{\r\n\t\"User\":\"" + NAME + "\",\r\n\t\"Message\":\"" + mess + "\"\r\n}")
                                     .asString();
                             Response data = new Gson().fromJson(response.getBody(), Response.class);
+                            listener.callback(true);
                             Message mes;
                             if (data.getIntent().equals("arribe")){
                                 mes  = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "google.navigation:q="+data.getFulfillmentText() ,outputformat.format(new Date()));
@@ -226,11 +253,13 @@ public class MainActivity extends AppCompatActivity {
 
                         } catch (UnirestException e) {
                             e.printStackTrace();
+                            listener.callback(false);
 
                         }
                     }
                     catch (Exception e) {
                         e.printStackTrace();
+                        listener.callback(false);
                     }
                 }
             });
