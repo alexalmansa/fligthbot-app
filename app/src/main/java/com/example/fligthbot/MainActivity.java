@@ -105,15 +105,21 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void callback(boolean success) {
                     if (success) {
-
-                        tvWritting.setVisibility(View.INVISIBLE);
-                        mMessageAdapter.notifyDataSetChanged();
-                        mMessageRecycler.scrollToPosition(messageList.size() - 1);
-                    }else {
-                        tvWritting.setVisibility(View.INVISIBLE);
                         MainActivity.this.runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
+                                tvWritting.setVisibility(View.INVISIBLE);
+                                mMessageAdapter.notifyDataSetChanged();
+                                mMessageRecycler.scrollToPosition(messageList.size() - 1);
+                            }
+                        });
+
+                    }else {
+
+                        MainActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tvWritting.setVisibility(View.INVISIBLE);
                                 Toast.makeText(MainActivity.this,
                                         "Error connecting to GoFly server, check that you have the correct ip and that the server is running", Toast.LENGTH_LONG).show();
                             }
