@@ -21,11 +21,13 @@ import com.google.gson.Gson;
 import java.util.ArrayList;
 
 public class ConfigActivity extends AppCompatActivity {
-    SharedPreferences sharedPreferences;
-    TextInputEditText tiIp;
-    TextInputEditText tiName;
-    Button btnSave;
-    Button btnDelete;
+    private SharedPreferences sharedPreferences;
+    private TextInputEditText tiIp;
+    private TextInputEditText tiName;
+    private Button btnSave;
+    private Button btnDelete;
+    private ArrayList <Message> messages;
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {

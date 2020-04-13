@@ -22,7 +22,8 @@
         android:layout_marginTop="4dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
-        android:layout_marginLeft="8dp" />
+        android:layout_marginLeft="8dp"
+        android:autoLink="all"/>
 
     <TextView
         android:id="@+id/text_message_time"

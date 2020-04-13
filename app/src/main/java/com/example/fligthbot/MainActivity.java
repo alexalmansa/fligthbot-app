@@ -111,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
                                 tvWritting.setVisibility(View.INVISIBLE);
                                 mMessageAdapter.notifyDataSetChanged();
                                 mMessageRecycler.scrollToPosition(messageList.size() - 1);
+
                             }
                         });
 
@@ -121,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
                             public void run() {
                                 tvWritting.setVisibility(View.INVISIBLE);
                                 Toast.makeText(MainActivity.this,
-                                        "Error connecting to GoFly server, check that you have the correct ip and that the server is running", Toast.LENGTH_LONG).show();
+                                        "Error connecting to GoFly server with ip: "+ IP + ", check that you have the correct ip and that the server is running", Toast.LENGTH_LONG).show();
                             }
                         });
                     }
@@ -134,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
 
             tvWritting = findViewById(R.id.tv_writting);
             mMessageRecycler = (RecyclerView) findViewById(R.id.reyclerview_message_list);
-            mMessageRecycler.setNestedScrollingEnabled(false);
+            //mMessageRecycler.setNestedScrollingEnabled(false);
             mMessageRecycler.setHasFixedSize(false);
             LinearLayoutManager linearLayoutManager = new LinearLayoutManager(MainActivity.this);
 
@@ -152,16 +153,7 @@ public class MainActivity extends AppCompatActivity {
                 public void onClick(View v) {
                     Intent intent = new Intent(getApplicationContext(), ConfigActivity.class);
                     startActivity(intent);
-                    IP = sharedPreferences.getString(getString(R.string.IP_KEY), null);
-                    NAME = sharedPreferences.getString(getString(R.string.NAME_KEY), null);
-                    String jsonPreferences = sharedPreferences.getString(getString(R.string.MESSAGE_KEY), "");
-                    Gson gson = new Gson();
-                    Type type = new TypeToken<List<Message>>() {}.getType();
-                    ArrayList<Message> messages = gson.fromJson(jsonPreferences, type);
-                    if (messages == null){
-                        messageList.clear();
-                    }
-                    mMessageAdapter.notifyDataSetChanged();
+
                 }
             });
 
@@ -211,28 +203,26 @@ public class MainActivity extends AppCompatActivity {
                     mChatBox.setText("");
                     mMessageAdapter.notifyDataSetChanged();
                     tvWritting.setVisibility(View.VISIBLE);
-                    final Handler handler = new Handler();
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-
-
-
-
-                        }
-                    }, 2500);
                 }
             });
         }
         private void httpRequest(){
+            //Chatch exceptions thrown by thread
+            Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                @Override
+                public void uncaughtException(Thread t, Throwable e) {
+                    System.out.println("Connection to "+ IP + " port : " + PORT + " unreachable");
+                    listener.callback(false);
+
+                }
+            });
             Thread thread = new Thread(new Runnable() {
 
                 @Override
                 public void run() {
-                    try  {
                         try {
                             String mess = mChatBox.getText().toString().replaceAll("\n", "");
-                            Unirest.setTimeouts(0, 0);
+                            Unirest.setTimeouts(5000, 0);
                             HttpResponse<String> response = Unirest.post("http://" +IP + ":"+PORT)
                                     .header("Content-Type", "text/plain")
                                     .body("{\r\n\t\"User\":\"" + NAME + "\",\r\n\t\"Message\":\"" + mess + "\"\r\n}")
@@ -251,22 +241,27 @@ public class MainActivity extends AppCompatActivity {
                                 address = address.substring(0,address.indexOf("--"));
                                 mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED, "geo:0,0?q="+address ,outputformat.format(new Date()));
 
+                            }else if (data.getIntent().equals("Phone")){
+                                try {
+                                    String phone = data.getFulfillmentText().substring(data.getFulfillmentText().indexOf(":")+1);
+                                    phone = phone.replaceAll(" ", "");
+                                    mes = new Message("The phone is : \n" + phone,Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
+                                }catch (Exception e){
+                                    mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
+                                }
+
                             }else{
                                 mes = new Message(data.getFulfillmentText(),Message.VIEW_TYPE_MESSAGE_RECEIVED,outputformat.format(new Date()));
 
                             }
                             messageList.add(mes);
 
-                        } catch (UnirestException e) {
+                        } catch (Exception e) {
                             e.printStackTrace();
                             listener.callback(false);
 
                         }
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                        listener.callback(false);
-                    }
+
                 }
             });
 
@@ -285,6 +280,21 @@ public class MainActivity extends AppCompatActivity {
             editor.commit();
             super.onPause();
         }
+
+    @Override
+    protected void onPostResume() {
+        IP = sharedPreferences.getString(getString(R.string.IP_KEY), null);
+        NAME = sharedPreferences.getString(getString(R.string.NAME_KEY), null);
+        String jsonPreferences = sharedPreferences.getString(getString(R.string.MESSAGE_KEY), "");
+        Gson gson = new Gson();
+        Type type = new TypeToken<List<Message>>() {}.getType();
+        ArrayList<Message> messages = gson.fromJson(jsonPreferences, type);
+        if (messages != null && messages.size() == 0){
+            messageList.clear();
+        }
+        mMessageAdapter.notifyDataSetChanged();
+        super.onPostResume();
+    }
 }
 
 
